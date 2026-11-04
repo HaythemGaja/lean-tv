@@ -10,13 +10,22 @@ Two apps that go together, in one repository.
 The launcher is a clean Home screen for an Android TV: a row of tiles, no recommendations, no ads. The remote
 drives it from a phone over the TV's own debug bridge, so nothing extra has to be installed on the TV.
 
-## Get the apps
+## Get the two APKs
 
-Two ways, same result:
+[`BUILD.md`](BUILD.md) is the full guide. The short version:
 
-- **Already built:** `lean-tv-launcher.apk` and `lean-tv-remote.apk` are attached to the
-  [`v1.0` release](../../releases/tag/v1.0). Download them there and skip to Install.
-- **Build them here:** see [Build](#build) below. Three commands, about a minute.
+- **No tools installed?** Push the source and let GitHub build them: **Actions → Build the two APKs → Run
+  workflow**, then download the `lean-tv-apks` artifact. It holds one `app-release.apk` for the TV and one for
+  the phone.
+- **One command locally:** `bash build.sh` (or `build.ps1` on Windows). Both APKs end up under
+  `launcher/app/build/outputs/apk/release/` and `phone/app/build/outputs/apk/release/`.
+
+Expected result of a fresh build:
+
+| APK | Comes from | Size | Label |
+|---|---|---|---|
+| `lean-tv-launcher.apk` | `launcher/` | 617,850 B | Lean TV |
+| `lean-tv-remote.apk` | `phone/` | 24,632 B | Lean TV Remote |
 
 ## Install
 
@@ -43,7 +52,7 @@ When the TV is set up, turn debugging off again: it is an open door on the same 
 ## What the launcher adds
 
 The launcher is Gathin23's cleanyourtv launcher, unchanged in look, with four additions. They are off in the
-upstream source and **on in the APK from this repository**:
+upstream source and **on in this repository's build**:
 
 - **Folders** - hold OK on a tile to make one; folders can hold folders.
 - **Arrow-pattern lock** - an invisible Up/Down/Left/Right pattern guards apps, folders and Settings. The last
@@ -55,26 +64,12 @@ upstream source and **on in the APK from this repository**:
 To turn them off, set `folders` and `pin_lock` to `false` in
 `launcher/app/src/main/res/values/config.xml` and rebuild.
 
-## Build
-
-JDK 17, Android SDK platform 34, build-tools 34.0.0.
-
-```bash
-cd launcher && ./gradlew --no-daemon assembleRelease
-cp app/build/outputs/apk/release/app-release.apk ../lean-tv-launcher.apk
-cd ../phone && ../launcher/gradlew --no-daemon assembleRelease
-cp app/build/outputs/apk/release/app-release.apk ../lean-tv-remote.apk
-```
-
-Both apps use the launcher's Gradle wrapper (Gradle 8.9, AGP 8.5.2), so the repository carries one Gradle
-version and `phone/` needs no wrapper of its own.
-
 ## Honest notes
 
 - The remote is a remote: it sends key events and reads status. It does not debloat the TV.
 - Unicode text (Hebrew, Arabic, emoji) cannot be typed through `input text`; those characters are dropped.
 - Nothing here uninstalls an app, and nothing needs root.
-- The APKs here are signed with a debug key. Fine for sideloading; not for publishing.
+- The APKs here are signed with a debug key. Fine for sideloading, not for publishing.
 
 ## Credit
 
