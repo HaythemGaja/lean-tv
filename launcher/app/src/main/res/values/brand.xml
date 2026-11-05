@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The launcher's name. A brand, so never translated: the TV shows "Lean TV" in every language. -->
+<resources>
+    <string name="brand_name" translatable="false">Lean TV</string>
+</resources>

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The pattern screen: Up, Down, Left and Right are steps, OK finishes a pattern being chosen, Back gives up.
+     Nothing here shows how many steps were pressed: the pattern is drawn blind. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FF0B0F14">
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:paddingStart="48dp"
+        android:paddingEnd="48dp"
+        android:paddingTop="28dp"
+        android:paddingBottom="28dp">
+
+        <TextView
+            android:id="@+id/pinTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/pin_enter"
+            android:textColor="#FFFFFFFF"
+            android:textSize="30sp"
+            android:fontFamily="@string/font_medium" />
+
+        <TextView
+            android:id="@+id/pinSubtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:textColor="#FFACB8C1"
+            android:textSize="16sp"
+            android:fontFamily="@string/font_body" />
+
+        <TextView
+            android:id="@+id/pinMessage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:minHeight="24dp"
+            android:gravity="center"
+            android:textColor="#FFE06C6C"
+            android:textSize="18sp"
+            android:fontFamily="@string/font_body" />
+
+        <TextView
+            android:id="@+id/pinHint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="center"
+            android:text="@string/pin_hint"
+            android:textColor="#FF8A97A1"
+            android:textSize="14sp"
+            android:fontFamily="@string/font_body" />
+    </LinearLayout>
+</FrameLayout>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lean TV icon, foreground layer: a TV screen with one play mark, nothing else. Kept inside the
+     66dp safe zone so no launcher mask can crop the mark. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M26,34h56v36h-56z"
+        android:strokeColor="#FFF8FAFC"
+        android:strokeWidth="4.5"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M46,73h16l-2,7h-12z"
+        android:fillColor="#FFF8FAFC" />
+    <path
+        android:pathData="M48,42l20,10l-20,10z"
+        android:fillColor="#FF34D399" />
+</vector>

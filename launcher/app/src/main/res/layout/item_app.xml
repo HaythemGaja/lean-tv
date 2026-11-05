@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
+    android:clipChildren="false"
+    android:clipToPadding="false">
+
+    <FrameLayout
+        android:id="@+id/card"
+        android:layout_width="180dp"
+        android:layout_height="101dp"
+        android:layout_gravity="center_horizontal|top"
+        android:background="@drawable/tile_bg"
+        android:focusable="true"
+        android:clickable="true">
+
+        <ImageView
+            android:id="@+id/banner"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:contentDescription="@null" />
+
+        <ImageView
+            android:id="@+id/icon"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="center"
+            android:layout_marginBottom="14dp"
+            android:visibility="gone"
+            android:contentDescription="@null" />
+
+        <!-- folders: the first four apps the folder holds, drawn as its cover instead of the folder mark. -->
+        <LinearLayout
+            android:id="@+id/cover"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/cover0"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:layout_margin="3dp"
+                    android:contentDescription="@null" />
+
+                <ImageView
+                    android:id="@+id/cover1"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:layout_margin="3dp"
+                    android:contentDescription="@null" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/cover2"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:layout_margin="3dp"
+                    android:contentDescription="@null" />
+
+                <ImageView
+                    android:id="@+id/cover3"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:layout_margin="3dp"
+                    android:contentDescription="@null" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:paddingBottom="8dp"
+            android:gravity="center"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:textColor="#FFFFFFFF"
+            android:textSize="13sp"
+            android:fontFamily="@string/font_body"
+            android:visibility="gone" />
+
+        <!-- pin_lock: this tile, or the folder, asks for the pattern before it opens. -->
+        <ImageView
+            android:id="@+id/badge"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="6dp"
+            android:layout_marginEnd="6dp"
+            android:src="@drawable/ic_lock"
+            android:tint="#FFFFFFFF"
+            android:visibility="gone"
+            android:contentDescription="@null" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/name"
+        android:layout_width="180dp"
+        android:layout_height="22dp"
+        android:layout_gravity="center_horizontal|top"
+        android:layout_marginTop="108dp"
+        android:includeFontPadding="false"
+        android:gravity="center"
+        android:singleLine="true"
+        android:ellipsize="end"
+        android:alpha="0"
+        android:translationY="-6dp"
+        android:textColor="#F2FFFFFF"
+        android:textSize="14sp"
+        android:fontFamily="@string/font_medium"
+        android:letterSpacing="0.02" />
+</FrameLayout>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Lean TV Remote</string>
+    <string name="title">Lean TV Remote</string>
+    <string name="host_hint">TV address, e.g. 192.168.1.50</string>
+    <string name="connect">Connect</string>
+    <string name="not_connected">Not connected</string>
+    <string name="connecting">Connecting to %1$s…</string>
+    <string name="connected">Connected to %1$s</string>
+    <string name="failed">Failed: %1$s</string>
+    <string name="needs_address">Enter the TV\'s address first.</string>
+    <string name="send">Send</string>
+    <string name="text_hint">Text to type on the TV</string>
+    <string name="up">▲</string>
+    <string name="down">▼</string>
+    <string name="left">◀</string>
+    <string name="right">▶</string>
+    <string name="ok">OK</string>
+    <string name="back">Back</string>
+    <string name="home">Home</string>
+    <string name="power">Power</string>
+    <string name="volume_up">Vol +</string>
+    <string name="volume_down">Vol −</string>
+    <string name="scan">Scan</string>
+    <string name="saved">Saved TVs</string>
+    <string name="apps">Apps</string>
+    <string name="health">Health</string>
+    <string name="screen">Screen</string>
+    <string name="scanning">Looking for TVs on this network…</string>
+    <string name="no_tvs_found">No TV answered. Turn on network debugging in the TV\'s Developer options.</string>
+    <string name="tvs_found">%1$d TVs found</string>
+    <string name="no_saved">No TV saved yet: connect to one first.</string>
+    <string name="forget">Forget all saved TVs</string>
+    <string name="forgot">Saved TVs forgotten</string>
+    <string name="apps_loading">Reading the TV\'s apps…</string>
+    <string name="no_apps">No launchable app found.</string>
+    <string name="health_reading">Reading the TV\'s health…</string>
+</resources>
