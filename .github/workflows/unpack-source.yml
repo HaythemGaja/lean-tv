@@ -1,0 +1,40 @@
+name: Unpack source into folders
+
+# Turns lean-tv-source.zip into launcher/ and phone/ as real folders, once.
+# Actions -> Unpack source into folders -> Run workflow. Then the zip is gone and the
+# repository is plain source, which build.sh and the APK workflow both pick up directly.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  unpack:
+    name: Unpack
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Unpack the zip into folders
+        run: |
+          set -e
+          if [ -f launcher/app/build.gradle ] && [ -f phone/app/build.gradle ]; then
+            echo "already unpacked, nothing to do"
+            exit 0
+          fi
+          if [ ! -f lean-tv-source.zip ]; then
+            echo "no lean-tv-source.zip in this checkout"
+            exit 1
+          fi
+          unzip -q -o lean-tv-source.zip
+          rm -f lean-tv-source.zip
+          chmod +x launcher/gradlew phone/gradlew
+          echo "launcher/ $(find launcher -type f | wc -l) files, phone/ $(find phone -type f | wc -l) files"
+          grep -E 'folders|pin_lock' launcher/app/src/main/res/values/config.xml | grep bool
+          git config user.name "lean-tv"
+          git config user.email "leantv@users.noreply.github.com"
+          git add -A
+          git commit -m "unpack lean-tv-source.zip into launcher/ and phone/"
+          git push
