@@ -1,0 +1,37 @@
+name: apply fix
+
+# One shot: assembles the compressed diff the contents API cannot carry in one piece, applies it, and
+# removes its own carrier files in the same commit.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply the patches
+        run: |
+          set -euo pipefail
+          cat .github/fix-l-00 .github/fix-l-01 | base64 -d | xz -d > /tmp/launcher.patch
+          cat .github/fix-p-00 .github/fix-p-01 .github/fix-p-02 .github/fix-p-03 .github/fix-p-04 \
+            | base64 -d | xz -d > /tmp/phone.patch
+          git apply --whitespace=nowarn /tmp/launcher.patch
+          git apply --whitespace=nowarn /tmp/phone.patch
+          git diff --stat
+
+      - name: Commit and remove the carriers
+        run: |
+          set -euo pipefail
+          rm -f .github/fix-l-00 .github/fix-l-01 \
+                .github/fix-p-00 .github/fix-p-01 .github/fix-p-02 .github/fix-p-03 .github/fix-p-04 \
+                .github/workflows/apply-fix.yml
+          git config user.name "Lean TV"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Launcher: the pattern shows its presses, and a locked tile opens after a rebuild; phone: clean and customise the TV"
+          git push
