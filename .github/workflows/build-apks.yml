@@ -35,13 +35,25 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Android SDK
+      - name: Android platform 34 and build-tools 34.0.0
         if: steps.src.outputs.launcher == '1' || steps.src.outputs.phone == '1'
-        uses: android-actions/setup-android@v3
-
-      - name: Platform 34 and build-tools 34.0.0
-        if: steps.src.outputs.launcher == '1' || steps.src.outputs.phone == '1'
-        run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
+        run: |
+          set -e
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          if [ -z "$SDK" ] || [ ! -d "$SDK" ]; then
+            SDK="$HOME/android-sdk"
+            mkdir -p "$SDK/cmdline-tools"
+            curl -sSL -o /tmp/cmdline-tools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+            unzip -q /tmp/cmdline-tools.zip -d "$SDK/cmdline-tools"
+            mv "$SDK/cmdline-tools/cmdline-tools" "$SDK/cmdline-tools/latest"
+          fi
+          MANAGER="$SDK/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$MANAGER" ]; then MANAGER="$(command -v sdkmanager)"; fi
+          echo "using SDK $SDK"
+          yes | "$MANAGER" --sdk_root="$SDK" --licenses > /dev/null 2>&1 || true
+          yes | "$MANAGER" --sdk_root="$SDK" "platforms;android-34" "build-tools;34.0.0" > /dev/null
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
 
       - name: Lean TV launcher (TV)
         if: steps.src.outputs.launcher == '1'
