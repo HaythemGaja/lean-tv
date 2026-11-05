@@ -15,6 +15,13 @@ jobs:
       - name: Check out
         uses: actions/checkout@v4
 
+      - name: Unpack the source if it ships as a zip
+        run: |
+          if [ -f lean-tv-source.zip ] && { [ ! -f launcher/app/build.gradle ] || [ ! -f phone/app/build.gradle ]; }; then
+            unzip -q -o lean-tv-source.zip
+            echo "unpacked lean-tv-source.zip"
+          fi
+
       - name: Which apps are in this repository
         id: src
         run: |

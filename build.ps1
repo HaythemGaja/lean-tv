@@ -1,6 +1,16 @@
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
+# The source may ship as lean-tv-source.zip, with launcher/ and phone/ inside it.
+if ((-not (Test-Path launcher\app\build.gradle)) -or (-not (Test-Path phone\app\build.gradle))) {
+    if (Test-Path lean-tv-source.zip) {
+        Write-Host "unpacking lean-tv-source.zip"
+        Expand-Archive -Path lean-tv-source.zip -DestinationPath . -Force
+    } else {
+        throw "no launcher/ or phone/ here, and no lean-tv-source.zip to unpack"
+    }
+}
+
 Write-Host "== Lean TV launcher (TV) =="
 Push-Location launcher
 .\gradlew.bat --no-daemon assembleRelease
