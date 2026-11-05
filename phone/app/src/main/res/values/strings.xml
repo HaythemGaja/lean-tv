@@ -35,4 +35,39 @@
     <string name="apps_loading">Reading the TV\'s apps…</string>
     <string name="no_apps">No launchable app found.</string>
     <string name="health_reading">Reading the TV\'s health…</string>
+
+    <!-- Cleaning: switch apps off on the TV, never uninstall, and put them back. -->
+    <string name="clean">Clean the TV</string>
+    <string name="clean_reading">Reading the TV\'s apps…</string>
+    <string name="clean_off">Switch off apps (%1$d installed)</string>
+    <string name="clean_put_back">Put an app back (%1$d switched off)</string>
+    <string name="clean_put_back_all">Put back what this phone switched off (%1$d)</string>
+    <string name="clean_put_back_title">Put back</string>
+    <string name="clean_confirm_title">Switch these off?</string>
+    <string name="clean_confirm">%1$s\n\nNothing is uninstalled: every one of them can come back from this screen.</string>
+    <string name="clean_working">Switching off %1$d apps…</string>
+    <string name="clean_done">%1$d apps switched off. Put them back from this screen.</string>
+    <string name="clean_back_working">Putting %1$d apps back…</string>
+    <string name="clean_back_done">%1$d apps put back.</string>
+    <string name="clean_nothing">Nothing to change here.</string>
+
+    <!-- Customising: the Lean TV settings written to the TV\'s config.json overlay. -->
+    <string name="customize">Customize Lean TV</string>
+    <string name="customise_reading">Reading Lean TV\'s settings…</string>
+    <string name="customise_hint">These are written over the TV\'s config.json and Home restarts. A theme pushed from a computer keeps every key this screen does not change.</string>
+    <string name="customise_apply">Apply</string>
+    <string name="customise_writing">Writing the settings to the TV…</string>
+    <string name="customise_saved">Applied. Home restarted on the TV.</string>
+    <string name="customise_open_settings">Lean TV settings on the TV</string>
+    <string name="customise_restart">Restart Home on the TV</string>
+    <string name="restarted">Home restarted on the TV.</string>
+    <string name="set_default">TV default</string>
+    <string name="set_on">on</string>
+    <string name="set_off">off</string>
+    <string name="set_columns">Tiles per row</string>
+    <string name="set_rows">Rows under the dock</string>
+    <string name="set_dock_opacity">Dock opacity</string>
+    <string name="set_folders">Folders on Home</string>
+    <string name="set_pin_lock">Invisible lock</string>
+    <string name="set_greeting">Greeting</string>
 </resources>

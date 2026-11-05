@@ -118,6 +118,14 @@ final class AdbClient implements Closeable {
         return run("pm list packages -3");
     }
 
+    /**
+     * A command whose answer matters, on a stream of its own. Callers build the whole line, so every package name
+     * and every setting they put in it is checked by them first; see {@link Clean} and {@link LeanConfig}.
+     */
+    String shell(String command) throws IOException {
+        return run(command);
+    }
+
     /** A line about uptime, free memory and the data partition's free space. */
     String health() throws IOException {
         return Health.describe(run("cat /proc/uptime"), run("cat /proc/meminfo"), run("df /data"));

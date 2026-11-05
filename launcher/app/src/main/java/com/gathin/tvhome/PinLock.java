@@ -41,6 +41,8 @@ final class PinLock {
     static final String KEY_STEPS = "pin_steps";
     static final String KEY_APPS = "pin_locked_apps";
     static final String KEY_SETTINGS = "pin_lock_settings";
+    /** The app a locked tile was opening, kept so the launch survives Home being rebuilt behind the pattern screen. */
+    static final String KEY_PENDING = "pin_pending_pkg";
 
     private PinLock() { }
 
@@ -119,7 +121,7 @@ final class PinLock {
     /** Forgets the pattern and everything it locked. */
     static void clear(Context ctx) {
         prefs(ctx).edit().remove(KEY_KIND).remove(KEY_HASH).remove(KEY_SALT).remove(KEY_STEPS)
-                .remove(KEY_APPS).remove(KEY_SETTINGS).apply();
+                .remove(KEY_APPS).remove(KEY_SETTINGS).remove(KEY_PENDING).apply();
     }
 
     // ---- what is locked --------------------------------------------------------------------------

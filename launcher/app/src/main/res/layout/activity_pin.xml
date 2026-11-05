@@ -37,6 +37,19 @@
             android:textSize="16sp"
             android:fontFamily="@string/font_body" />
 
+        <!-- One dot per press: proof that the remote is reaching this screen, never which arrow was pressed. -->
+        <TextView
+            android:id="@+id/pinDots"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:minHeight="30dp"
+            android:letterSpacing="0.12"
+            android:gravity="center"
+            android:textColor="#FFFFFFFF"
+            android:textSize="22sp"
+            android:fontFamily="@string/font_body" />
+
         <TextView
             android:id="@+id/pinMessage"
             android:layout_width="wrap_content"

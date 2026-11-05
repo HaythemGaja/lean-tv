@@ -11,9 +11,10 @@ import android.widget.TextView;
  * D-pad are steps, Delete takes the last one back, OK finishes a pattern being chosen and Back gives up.
  * Finishes with {@link #RESULT_OK} only for the right pattern; the caller then runs the action it held back.
  *
- * <p>The entry is blind on purpose: nothing on screen counts the steps or draws what was pressed, so the pattern
- * cannot be read over someone's shoulder and its length is not on display either. In unlock mode the screen
- * submits by itself at the stored length, which is what makes a blind entry workable.
+ * <p>A dot appears for each press, so an entry that reaches the screen can be seen to be working and a mistake can
+ * be taken back before the pattern is finished. What is never shown is which arrow was pressed, so the pattern
+ * cannot be read over someone's shoulder. In unlock mode the screen submits by itself at the stored length, which
+ * is what makes an entry workable without reaching for OK.
  *
  * <p>A wrong pattern says so and clears the entry: there is no wait before the next try.
  *
@@ -36,6 +37,7 @@ public final class PinActivity extends Activity {
     private String chosen = "";
     private TextView title;
     private TextView message;
+    private TextView dots;
 
     @Override
     protected void attachBaseContext(android.content.Context base) {
@@ -50,6 +52,7 @@ public final class PinActivity extends Activity {
         length = PinLock.steps(this);
         title = findViewById(R.id.pinTitle);
         message = findViewById(R.id.pinMessage);
+        dots = findViewById(R.id.pinDots);
         title.setText(choosing ? R.string.pin_choose : R.string.pin_enter);
         String label = getIntent().getStringExtra(EXTRA_LABEL);
         // The hint has to match the screen: unlocking submits itself, choosing a new pattern still ends on OK.
@@ -100,14 +103,26 @@ public final class PinActivity extends Activity {
     private void add(char step) {
         if (entry.length() >= PinLock.MAX_STEPS) return;
         entry.append(step);
-        // Nothing is drawn for a step: the pattern stays invisible, and an old message stops applying.
+        // A dot says a press arrived; which arrow it was stays off the screen, and an old message stops applying.
         message.setText("");
+        render();
         if (PinLock.submitsAt(choosing, entry.length(), length)) submit();
     }
 
     private void back() {
         if (entry.length() == 0) return;
         entry.setLength(entry.length() - 1);
+        render();
+    }
+
+    /**
+     * One dot per step pressed, and nothing about which step it was: enough to see that the remote is reaching the
+     * screen and to count the entry without putting the pattern itself on display.
+     */
+    private void render() {
+        StringBuilder shown = new StringBuilder();
+        for (int i = 0; i < entry.length(); i++) shown.append("\u25CF ");
+        dots.setText(shown.toString().trim());
     }
 
     private void submit() {
@@ -136,6 +151,7 @@ public final class PinActivity extends Activity {
             repeating = true;
             title.setText(R.string.pin_repeat);
             message.setText("");
+            render();
             return;
         }
         if (!chosen.equals(entry.toString())) {
@@ -144,6 +160,7 @@ public final class PinActivity extends Activity {
             repeating = false;
             title.setText(R.string.pin_choose);
             message.setText(R.string.pin_mismatch);
+            render();
             return;
         }
         setResult(RESULT_OK, new Intent().putExtra(EXTRA_PATTERN, chosen));
@@ -160,5 +177,6 @@ public final class PinActivity extends Activity {
         }
         entry.setLength(0);
         message.setText(R.string.pin_wrong);
+        render();
     }
 }

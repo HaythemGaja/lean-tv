@@ -630,7 +630,10 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             return;
         }
-        if (e.locked && pinLockEnabled && listener.onLockedLaunch(e.pkg, () -> launchApp(e))) return;
+        // The tile's own flag, and the stored set read again: a tile drawn before the lock was set cannot open
+        // around it, which is the one failure of this lock that matters.
+        if (pinLockEnabled && (e.locked || PinLock.locked(ctx, e.pkg))
+                && listener.onLockedLaunch(e.pkg, () -> launchApp(e))) return;
         launchApp(e);
     }
 

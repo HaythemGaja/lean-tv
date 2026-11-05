@@ -16,7 +16,9 @@ import android.widget.TextView;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -85,6 +87,8 @@ public final class MainActivity extends Activity {
         findViewById(R.id.health).setOnClickListener(v -> showHealth());
         findViewById(R.id.screen).setOnClickListener(v -> toggleMirror());
         findViewById(R.id.send).setOnClickListener(v -> sendText());
+        findViewById(R.id.clean).setOnClickListener(v -> showClean());
+        findViewById(R.id.customize).setOnClickListener(v -> showCustomize());
 
         button(R.id.up, KEY_UP);
         button(R.id.down, KEY_DOWN);
@@ -345,6 +349,238 @@ public final class MainActivity extends Activity {
                 preview.setImageBitmap(shown);
                 ui.postDelayed(this::grabFrame, MIRROR_EVERY_MS);
             });
+        });
+    }
+
+    // ---- cleaning and customising the TV ---------------------------------------------------------
+
+    /** The apps this phone switched off on the TV, kept so they can be put back after a restart of the phone app. */
+    private static final String CLEAN_RESTORE = "clean_restore";
+
+    /**
+     * Cleaning: what the TV has, what may be switched off, and what comes back. Nothing here uninstalls anything:
+     * an app is switched off for the TV's main user and put back from the same screen.
+     */
+    private void showClean() {
+        show(getString(R.string.clean_reading));
+        io.execute(() -> {
+            try {
+                AdbClient tv = live();
+                List<String> installed = Clean.packages(tv.packages());
+                List<String> off = Clean.packages(tv.shell("pm list packages -d"));
+                List<String> canGo = Clean.offered(installed, off);
+                List<String> back = new ArrayList<>();
+                for (String pkg : off) if (!Clean.protectedPackage(pkg)) back.add(pkg);
+                List<String> point = restorePoint();
+                ui.post(() -> new AlertDialog.Builder(this)
+                        .setTitle(R.string.clean)
+                        .setItems(new String[]{
+                                getString(R.string.clean_off, canGo.size()),
+                                getString(R.string.clean_put_back, back.size()),
+                                getString(R.string.clean_put_back_all, point.size()),
+                        }, (dialog, which) -> {
+                            if (which == 0) pickToSwitchOff(canGo);
+                            else if (which == 1) pickToPutBack(back);
+                            else putBack(point);
+                        })
+                        .show());
+            } catch (IOException | RuntimeException e) {
+                fail(e);
+            }
+        });
+    }
+
+    /** The rows ticked in a multi-choice dialog, in the order they were offered. */
+    private static List<String> ticked(List<String> offered, boolean[] ticked) {
+        List<String> chosen = new ArrayList<>();
+        for (int i = 0; i < offered.size(); i++) if (ticked[i]) chosen.add(offered.get(i));
+        return chosen;
+    }
+
+    private void pickToSwitchOff(List<String> canGo) {
+        if (canGo.isEmpty()) {
+            show(getString(R.string.clean_nothing));
+            return;
+        }
+        final boolean[] ticked = new boolean[canGo.size()];
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.clean)
+                .setMultiChoiceItems(canGo.toArray(new String[0]), ticked,
+                        (dialog, which, checked) -> ticked[which] = checked)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(android.R.string.ok, (dialog, which) -> {
+                    List<String> chosen = ticked(canGo, ticked);
+                    if (chosen.isEmpty()) {
+                        show(getString(R.string.clean_nothing));
+                        return;
+                    }
+                    confirmSwitchOff(chosen);
+                })
+                .show();
+    }
+
+    private void confirmSwitchOff(List<String> chosen) {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.clean_confirm_title)
+                .setMessage(getString(R.string.clean_confirm, Clean.plan(chosen)))
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.clean, (dialog, which) -> switchOff(chosen))
+                .show();
+    }
+
+    /** Switched off one shell call per package, and written down before it is reported as done. */
+    private void switchOff(List<String> chosen) {
+        show(getString(R.string.clean_working, chosen.size()));
+        io.execute(() -> {
+            try {
+                AdbClient tv = live();
+                List<String> point = restorePoint();
+                for (String pkg : chosen) {
+                    tv.shell("pm disable-user --user 0 " + pkg);
+                    if (!point.contains(pkg)) point.add(pkg);
+                }
+                saveRestorePoint(point);
+                ui.post(() -> show(getString(R.string.clean_done, chosen.size())));
+            } catch (IOException | RuntimeException e) {
+                fail(e);
+            }
+        });
+    }
+
+    private void pickToPutBack(List<String> off) {
+        if (off.isEmpty()) {
+            show(getString(R.string.clean_nothing));
+            return;
+        }
+        final boolean[] ticked = new boolean[off.size()];
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.clean_put_back_title)
+                .setMultiChoiceItems(off.toArray(new String[0]), ticked,
+                        (dialog, which, checked) -> ticked[which] = checked)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(android.R.string.ok, (dialog, which) -> {
+                    List<String> chosen = ticked(off, ticked);
+                    if (chosen.isEmpty()) {
+                        show(getString(R.string.clean_nothing));
+                        return;
+                    }
+                    putBack(chosen);
+                })
+                .show();
+    }
+
+    private void putBack(List<String> packages) {
+        if (packages.isEmpty()) {
+            show(getString(R.string.clean_nothing));
+            return;
+        }
+        show(getString(R.string.clean_back_working, packages.size()));
+        io.execute(() -> {
+            try {
+                AdbClient tv = live();
+                for (String pkg : packages) tv.shell("pm enable " + pkg);
+                List<String> point = restorePoint();
+                point.removeAll(packages);
+                saveRestorePoint(point);
+                ui.post(() -> show(getString(R.string.clean_back_done, packages.size())));
+            } catch (IOException | RuntimeException e) {
+                fail(e);
+            }
+        });
+    }
+
+    private List<String> restorePoint() {
+        return Clean.decode(prefs().getString(CLEAN_RESTORE, ""));
+    }
+
+    private void saveRestorePoint(List<String> packages) {
+        prefs().edit().putString(CLEAN_RESTORE, Clean.encode(packages)).apply();
+    }
+
+    /**
+     * Customising: the Lean TV settings a phone row can carry, written to the launcher's config.json overlay and
+     * picked up by a restart of Home. Everything a row cannot carry is on the launcher's own settings screen,
+     * which this screen opens on the TV.
+     */
+    private void showCustomize() {
+        show(getString(R.string.customise_reading));
+        io.execute(() -> {
+            try {
+                int[] start = picks(LeanConfig.current(live()));
+                ui.post(() -> customizeDialog(start, start));
+            } catch (IOException | RuntimeException e) {
+                fail(e);
+            }
+        });
+    }
+
+    /** Where each row starts: the value the TV has, or TV default when the file does not name it. */
+    private static int[] picks(Map<String, String> now) {
+        int[] picks = new int[LeanConfig.SETTINGS.length];
+        for (int i = 0; i < picks.length; i++) {
+            LeanConfig.Setting setting = LeanConfig.SETTINGS[i];
+            for (int v = 0; v < setting.values.length; v++) {
+                if (setting.values[v].equals(now.get(setting.key))) picks[i] = v + 1;
+            }
+        }
+        return picks;
+    }
+
+    private void customizeDialog(int[] picks, int[] start) {
+        String[] rows = new String[LeanConfig.SETTINGS.length + 1];
+        for (int i = 0; i < LeanConfig.SETTINGS.length; i++) {
+            LeanConfig.Setting setting = LeanConfig.SETTINGS[i];
+            rows[i] = getString(setting.label) + ": " + shownValue(setting, picks[i]);
+        }
+        rows[rows.length - 1] = getString(R.string.customise_restart);
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.customize)
+                .setMessage(R.string.customise_hint)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setNeutralButton(R.string.customise_open_settings,
+                        (dialog, which) -> on(LeanConfig::openSettings))
+                .setPositiveButton(R.string.customise_apply, (dialog, which) -> applyCustomize(picks, start))
+                .setItems(rows, (dialog, which) -> {
+                    if (which == LeanConfig.SETTINGS.length) {
+                        on(LeanConfig::restartHome);
+                        return;
+                    }
+                    LeanConfig.Setting setting = LeanConfig.SETTINGS[which];
+                    picks[which] = (picks[which] + 1) % (setting.values.length + 1);
+                    customizeDialog(picks, start);   // the same screen, with that row moved on
+                })
+                .show();
+    }
+
+    /** A row's value as it reads: TV default, on or off, or the number itself. */
+    private String shownValue(LeanConfig.Setting setting, int pick) {
+        if (pick == 0) return getString(R.string.set_default);
+        String chosen = setting.values[pick - 1];
+        if ("true".equals(chosen)) return getString(R.string.set_on);
+        if ("false".equals(chosen)) return getString(R.string.set_off);
+        return chosen;
+    }
+
+    /** Only the rows that moved are written, so a theme pushed from a computer keeps everything else it set. */
+    private void applyCustomize(int[] picks, int[] start) {
+        Map<String, String> changes = new LinkedHashMap<>();
+        for (int i = 0; i < picks.length; i++) {
+            if (picks[i] == start[i]) continue;
+            LeanConfig.Setting setting = LeanConfig.SETTINGS[i];
+            changes.put(setting.key, picks[i] == 0 ? null : setting.values[picks[i] - 1]);
+        }
+        if (changes.isEmpty()) {
+            show(getString(R.string.clean_nothing));
+            return;
+        }
+        show(getString(R.string.customise_writing));
+        io.execute(() -> {
+            try {
+                LeanConfig.apply(live(), changes);
+                ui.post(() -> show(getString(R.string.customise_saved)));
+            } catch (IOException | RuntimeException e) {
+                fail(e);
+            }
         });
     }
 

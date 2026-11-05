@@ -1168,7 +1168,15 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (requestCode == REQUEST_PIN) {
             Runnable action = pendingPinAction;
             pendingPinAction = null;
-            if (resultCode == RESULT_OK && action != null) action.run();
+            String pkg = getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE)
+                    .getString(PinLock.KEY_PENDING, "");
+            if (pkg != null && !pkg.isEmpty()) {
+                getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE).edit()
+                        .remove(PinLock.KEY_PENDING).apply();
+            }
+            if (resultCode != RESULT_OK) return;
+            if (action != null) action.run();
+            else if (pkg != null && !pkg.isEmpty()) launchPackage(pkg);
             return;
         }
         if (requestCode == PinDialogs.REQUEST_SET_PATTERN) {
@@ -1827,8 +1835,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     /** A tile the PIN guards: asks for it, and runs the launch it held back only on success. */
     @Override
     public boolean onLockedLaunch(String pkg, Runnable launch) {
-        if (!pinEnabled || !PinLock.locked(this, pkg)) return false;
-        askPin(launch);
+        // A pattern is what the lock needs: whether this tile is in the locked set was decided when its tile was
+        // drawn, and reading the set again here could disagree with the tile the person is looking at.
+        if (!pinEnabled || !PinLock.hasPin(this)) return false;
+        askPin(launch, pkg);
         return true;
     }
 
@@ -1845,8 +1855,49 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     /** The pattern screen in front of a locked tile or the locked settings; {@code action} runs only for it. */
     private void askPin(Runnable action) {
+        askPin(action, null);
+    }
+
+    /**
+     * The same, and for a locked app the package it was opening too: Home can be rebuilt while the pattern screen
+     * is up (a 1 GB TV reclaiming memory, or clearTaskOnLaunch), and the action it held would be gone by the time
+     * the right pattern came back. The package is written down so the result can open the app anyway.
+     */
+    private void askPin(Runnable action, String pkg) {
         pendingPinAction = action;
+        getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE).edit()
+                .putString(PinLock.KEY_PENDING, pkg == null ? "" : pkg).apply();
         startActivityForResult(new Intent(this, PinActivity.class), REQUEST_PIN);
+    }
+
+    /**
+     * Opens a locked app by its own package, for a right pattern that came back after Home was rebuilt behind the
+     * pattern screen: the tile's launch is gone, the package it named is not. The leanback entry point comes first,
+     * as a TV app expects, then a plain one. Nothing here reads the pattern, which the screen has already checked.
+     */
+    private void launchPackage(String pkg) {
+        if (pkg == null || pkg.isEmpty()) return;
+        PackageManager pm = getPackageManager();
+        List<ResolveInfo> found = pm.queryIntentActivities(new Intent(Intent.ACTION_MAIN)
+                .addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER).setPackage(pkg), 0);
+        boolean leanback = !found.isEmpty();
+        if (!leanback) {
+            found = pm.queryIntentActivities(new Intent(Intent.ACTION_MAIN)
+                    .addCategory(Intent.CATEGORY_LAUNCHER).setPackage(pkg), 0);
+        }
+        if (found.isEmpty() || found.get(0).activityInfo == null) {
+            Toast.makeText(this, getString(R.string.cant_open, pkg), Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Intent intent = new Intent(Intent.ACTION_MAIN)
+                .setComponent(new ComponentName(pkg, found.get(0).activityInfo.name))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+        if (leanback) intent.addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER);
+        try {
+            startActivity(intent);
+        } catch (Exception e) {
+            Toast.makeText(this, getString(R.string.cant_open, pkg), Toast.LENGTH_SHORT).show();
+        }
     }
 
     /** Guest mode hides every locked tile at once; the pattern turns it on and off. */
