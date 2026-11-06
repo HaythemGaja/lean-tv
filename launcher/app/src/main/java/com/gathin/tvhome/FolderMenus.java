@@ -44,8 +44,13 @@ final class FolderMenus {
                 .show();
     }
 
-    /** Picks the folder an app goes into, with "New folder" first for one that does not exist yet. */
-    static void addToFolder(Activity activity, Folders folders, String pkg, Runnable done) {
+    /**
+     * Picks the folder an app goes into, with "New folder" first for one that does not exist yet.
+     * "New folder" is made inside {@code parentId} (null for Home): from inside a folder that is
+     * where a new folder belongs, not on Home. At the depth limit it falls back to Home, since
+     * a folder one deeper would be refused as too far down the tree.
+     */
+    static void addToFolder(Activity activity, Folders folders, String pkg, String parentId, Runnable done) {
         final List<Folders.Folder> all = folders.all();
         String[] labels = new String[all.size() + 1];
         labels[0] = activity.getString(R.string.folder_new);
@@ -59,7 +64,9 @@ final class FolderMenus {
                 .setTitle(R.string.folder_add_to)
                 .setItems(labels, (dialog, which) -> {
                     if (which == 0) {
-                        create(activity, folders, null, pkg, done);
+                        String parent = parentId;
+                        if (parent != null && folders.depth(parent) >= Folders.MAX_DEPTH) parent = null;
+                        create(activity, folders, parent, pkg, done);
                         return;
                     }
                     Folders.Folder folder = all.get(which - 1);

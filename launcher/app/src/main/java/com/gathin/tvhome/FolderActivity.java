@@ -281,7 +281,14 @@ public final class FolderActivity extends Activity implements FolderAdapter.List
             save();
         });
         addRow(rows, popup, R.string.folder_add_to,
-                () -> FolderMenus.addToFolder(this, folders, entry.pkg, this::save));
+                () -> FolderMenus.addToFolder(this, folders, entry.pkg, folderId, this::save));
+        // An empty subfolder inside the folder you are looking at: the subfolder menu already
+        // has this row, but a folder with no subfolder yet has no tile to long-press for it.
+        // This row is the way in from inside the folder; at the depth limit it is hidden.
+        if (folders.depth(folderId) < Folders.MAX_DEPTH) {
+            addRow(rows, popup, R.string.folder_new_inside,
+                    () -> FolderMenus.create(this, folders, folderId, null, this::save));
+        }
         if (pinEnabled) {
             addRow(rows, popup, PinLock.locked(this, entry.pkg) ? R.string.pin_unlock : R.string.pin_lock_app,
                     () -> toggleAppPin(entry.pkg));

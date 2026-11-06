@@ -4009,7 +4009,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         });
         if (foldersEnabled) addSettingsMenuRow(rows, popup, R.string.folder_add_to, () -> {
             Folders folders = Folders.load(this);
-            FolderMenus.addToFolder(this, folders, pkg, () -> foldersChanged(folders));
+            FolderMenus.addToFolder(this, folders, pkg, null, () -> foldersChanged(folders));
         });
         addSettingsMenuRow(rows, popup, R.string.hide_app, () -> {
             HiddenApps.set(this, pkg, true);
@@ -4073,6 +4073,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         PopupWindow popup = glassPopup(panel, (int) (200 * density));
         addSettingsMenuRow(rows, popup, R.string.folder_add_apps,
                 () -> FolderMenus.addApps(this, folders, folderId, () -> foldersChanged(folders)));
+        // There was no way to make a folder inside a folder from Home: the "New folder inside"
+        // row only existed on a subfolder's menu inside a folder, so a folder with no subfolder
+        // yet had nowhere to create its first one. Depth 4 is the tree's limit (Folders.MAX_DEPTH).
+        if (folders.depth(folderId) < Folders.MAX_DEPTH) {
+            addSettingsMenuRow(rows, popup, R.string.folder_new_inside,
+                    () -> FolderMenus.create(this, folders, folderId, null, () -> foldersChanged(folders)));
+        }
         addSettingsMenuRow(rows, popup, R.string.folder_rename,
                 () -> FolderMenus.rename(this, folders, folderId, () -> foldersChanged(folders)));
         if (pinEnabled) addSettingsMenuRow(rows, popup,

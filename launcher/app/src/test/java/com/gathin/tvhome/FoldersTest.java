@@ -65,6 +65,32 @@ public class FoldersTest {
     }
 
     @Test
+    public void aSubfoldersLockIsIndependentOfItsParent() {
+        Folders folders = Folders.empty();
+        Folders.Folder parent = folders.add("Parent", null);
+        Folders.Folder child = folders.add("Child", parent.id);
+        assertNotNull(parent);
+        assertNotNull(child);
+        // A new subfolder starts unlocked even when its parent is locked.
+        assertTrue(folders.setLocked(parent.id, true));
+        assertFalse(folders.folder(child.id).locked);
+        // Locking the child does not lock the parent.
+        assertTrue(folders.setLocked(child.id, true));
+        assertTrue(folders.folder(parent.id).locked);
+        // Unlocking the parent does not unlock the child.
+        assertTrue(folders.setLocked(parent.id, false));
+        assertTrue(folders.folder(child.id).locked);
+        // A folder made inside a locked parent starts unlocked too.
+        Folders.Folder grandchild = folders.add("Grandchild", child.id);
+        assertNotNull(grandchild);
+        assertFalse(folders.folder(grandchild.id).locked);
+        // Unlocking the child leaves the parent alone.
+        assertTrue(folders.setLocked(child.id, false));
+        assertFalse(folders.folder(parent.id).locked);
+        assertFalse(folders.folder(child.id).locked);
+    }
+
+    @Test
     public void aFolderCannotMoveIntoItself() {
         Folders folders = Folders.empty();
         Folders.Folder outer = folders.add("Outer", null);

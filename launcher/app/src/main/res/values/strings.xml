@@ -168,7 +168,7 @@
     <string name="folder_remove">Delete folder</string>
     <string name="folder_remove_confirm">Delete %1$s? The apps in it go back to Home.</string>
     <string name="folder_open">Open</string>
-    <string name="folder_empty">This folder is empty. Hold OK on a tile here for its options.</string>
+    <string name="folder_empty">This folder is empty. Long-press this folder on Home to add apps or a new folder inside.</string>
     <string name="folder_hint">Hold OK on a tile for its options.</string>
     <string name="folder_apps_count">%1$d apps</string>
     <string name="folder_default_name">Folder %1$d</string>
