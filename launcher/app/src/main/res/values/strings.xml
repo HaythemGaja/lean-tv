@@ -201,6 +201,16 @@
     <string name="pin_lock_folder">Lock folder</string>
     <string name="pin_clear_confirm">Remove the pattern? Everything it locks opens again.</string>
     <string name="pin_needed">Set a pattern first.</string>
+    <string name="pin_grace_state">PIN grace: %1$s</string>
+    <string name="pin_grace_minutes">%1$d min</string>
+    <string name="pin_grace_hour">1 hour</string>
+    <string name="pin_schedule_state">PIN-free hours: %1$s</string>
+    <string name="pin_schedule_days">PIN-free days</string>
+    <string name="pin_schedule_start">PIN-free from</string>
+    <string name="pin_schedule_end">PIN-free until</string>
+    <string name="pin_schedule_off">Turn off</string>
+    <string name="pin_schedule_every_day">Every day</string>
+    <string name="pin_schedule_all_day">All day</string>
 
     <!-- Hidden apps (hidden from the tile menu, brought back here) and guest mode (pin_lock). -->
     <string name="hide_app">Hide app</string>

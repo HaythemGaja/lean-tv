@@ -42,6 +42,8 @@ public final class LauncherSettingsActivity extends Activity {
     private TextView pinChoice;
     private TextView pinSettingsChoice;
     private TextView pinClearChoice;
+    private TextView pinGraceChoice;
+    private TextView pinScheduleChoice;
     private TextView hiddenChoice;
     private Runnable pendingPinAction;
     private static final int REQUEST_PIN = 4201;
@@ -162,10 +164,14 @@ public final class LauncherSettingsActivity extends Activity {
         pinChoice = findViewById(R.id.pinChoice);
         pinSettingsChoice = findViewById(R.id.pinSettingsChoice);
         pinClearChoice = findViewById(R.id.pinClearChoice);
+        pinGraceChoice = findViewById(R.id.pinGraceChoice);
+        pinScheduleChoice = findViewById(R.id.pinScheduleChoice);
         if (config.pinLock) {
             pinChoice.setVisibility(View.VISIBLE);
             pinSettingsChoice.setVisibility(View.VISIBLE);
             pinClearChoice.setVisibility(View.VISIBLE);
+            pinGraceChoice.setVisibility(View.VISIBLE);
+            pinScheduleChoice.setVisibility(View.VISIBLE);
             pinChoice.setOnClickListener(v -> PinDialogs.setPin(this));
             pinSettingsChoice.setOnClickListener(v -> {
                 if (!PinLock.hasPin(this)) {
@@ -176,6 +182,31 @@ public final class LauncherSettingsActivity extends Activity {
                 refresh();
             });
             pinClearChoice.setOnClickListener(v -> PinDialogs.clearPin(this, this::refresh));
+            // Grace: tap cycles Off, 5, 10, 15, 30 minutes, 1 hour. It only means something with
+            // a pattern set, so the row is dimmed until then, like Lock settings above it.
+            pinGraceChoice.setOnClickListener(v -> {
+                if (!PinLock.hasPin(this)) {
+                    Toast.makeText(this, R.string.pin_needed, Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                int current = PinLock.graceMinutes(this);
+                int next = PinLock.GRACE_OPTIONS[0];
+                for (int i = 0; i < PinLock.GRACE_OPTIONS.length; i++) {
+                    if (PinLock.GRACE_OPTIONS[i] == current) {
+                        next = PinLock.GRACE_OPTIONS[(i + 1) % PinLock.GRACE_OPTIONS.length];
+                        break;
+                    }
+                }
+                PinLock.setGraceMinutes(this, next);
+                refresh();
+            });
+            pinScheduleChoice.setOnClickListener(v -> {
+                if (!PinLock.hasPin(this)) {
+                    Toast.makeText(this, R.string.pin_needed, Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                showPinScheduleDays();
+            });
         }
         hiddenChoice = findViewById(R.id.hiddenChoice);
         hiddenChoice.setOnClickListener(v -> showHiddenApps());
@@ -282,6 +313,120 @@ public final class LauncherSettingsActivity extends Activity {
                 .show();
     }
 
+    /** The grace choice as the row shows it: Off, a number of minutes, or 1 hour. */
+    private String graceLabel() {
+        int minutes = PinLock.graceMinutes(this);
+        if (minutes <= 0) return getString(R.string.off);
+        if (minutes >= 60) return getString(R.string.pin_grace_hour);
+        return getString(R.string.pin_grace_minutes, minutes);
+    }
+
+    /** The PIN-free window as the row shows it: Off, days and hours such as "Mon–Fri 08:00–15:00", or All day. */
+    private String scheduleLabel() {
+        int start = PinLock.freeStart(this);
+        int end = PinLock.freeEnd(this);
+        int days = PinLock.freeDays(this);
+        if (start < 0 || end < 0 || days == 0) return getString(R.string.off);
+        // Start and end the same hour is the whole day, and "08:00–08:00" would read as an empty window.
+        if (start == end) return daysLabel(days) + " " + getString(R.string.pin_schedule_all_day);
+        return daysLabel(days) + " " + String.format(java.util.Locale.getDefault(),
+                "%02d:00–%02d:00", start, end);
+    }
+
+    /** Days as short names in the TV's language, Monday first; the whole week and Mon–Fri read as one range. */
+    private String daysLabel(int daysMask) {
+        String[] shortDays = new java.text.DateFormatSymbols().getShortWeekdays();
+        if (daysMask == 0x7F) return getString(R.string.pin_schedule_every_day);
+        if (daysMask == 0x3E) {
+            return shortDays[java.util.Calendar.MONDAY] + "–" + shortDays[java.util.Calendar.FRIDAY];
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int day : WEEKDAYS_MONDAY_FIRST) {
+            if ((daysMask & (1 << (day - 1))) != 0) {
+                if (sb.length() > 0) sb.append(", ");
+                sb.append(shortDays[day]);
+            }
+        }
+        return sb.toString();
+    }
+
+    /** Monday first, for the days picker and the label; the bit for a day is 1 << (day - 1). */
+    private static final int[] WEEKDAYS_MONDAY_FIRST = {
+            java.util.Calendar.MONDAY, java.util.Calendar.TUESDAY, java.util.Calendar.WEDNESDAY,
+            java.util.Calendar.THURSDAY, java.util.Calendar.FRIDAY, java.util.Calendar.SATURDAY,
+            java.util.Calendar.SUNDAY};
+
+    /**
+     * PIN-free hours, in three taps: which days, from when, until when. Each step is saved as it is picked,
+     * so backing out of a later step keeps the earlier ones; a window only runs once all three are set.
+     */
+    private void showPinScheduleDays() {
+        String[] shortDays = new java.text.DateFormatSymbols().getShortWeekdays();
+        String[] labels = new String[WEEKDAYS_MONDAY_FIRST.length];
+        boolean[] checked = new boolean[WEEKDAYS_MONDAY_FIRST.length];
+        int days = PinLock.freeDays(this);
+        for (int i = 0; i < WEEKDAYS_MONDAY_FIRST.length; i++) {
+            labels[i] = shortDays[WEEKDAYS_MONDAY_FIRST[i]];
+            checked[i] = (days & (1 << (WEEKDAYS_MONDAY_FIRST[i] - 1))) != 0;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.pin_schedule_days)
+                .setMultiChoiceItems(labels, checked, (dialog, which, isChecked) -> checked[which] = isChecked)
+                .setPositiveButton(android.R.string.ok, (dialog, which) -> {
+                    int mask = 0;
+                    for (int i = 0; i < WEEKDAYS_MONDAY_FIRST.length; i++) {
+                        if (checked[i]) mask |= 1 << (WEEKDAYS_MONDAY_FIRST[i] - 1);
+                    }
+                    PinLock.setFreeSchedule(this, PinLock.freeStart(this), PinLock.freeEnd(this), mask);
+                    refresh();
+                    // No days picked is a window that can never run: no point walking through the hours for it.
+                    if (mask != 0) showPinScheduleStart();
+                })
+                .setNeutralButton(R.string.pin_schedule_off, (dialog, which) -> {
+                    PinLock.clearFreeSchedule(this);
+                    refresh();
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void showPinScheduleStart() {
+        showPinScheduleHour(R.string.pin_schedule_start, PinLock.freeStart(this), start -> {
+            PinLock.setFreeSchedule(this, start, PinLock.freeEnd(this), PinLock.freeDays(this));
+            refresh();
+            showPinScheduleEnd();
+        });
+    }
+
+    private void showPinScheduleEnd() {
+        showPinScheduleHour(R.string.pin_schedule_end, PinLock.freeEnd(this), end -> {
+            PinLock.setFreeSchedule(this, PinLock.freeStart(this), end, PinLock.freeDays(this));
+            refresh();
+        });
+    }
+
+    /** One list of hours, 00:00 to 23:00; the pick is saved at once, then the next step runs. */
+    private void showPinScheduleHour(int title, int current, HourPicked onPick) {
+        String[] labels = new String[24];
+        for (int i = 0; i < 24; i++) {
+            labels[i] = String.format(java.util.Locale.getDefault(), "%02d:00", i);
+        }
+        int checked = current >= 0 && current < 24 ? current : 8;
+        new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setSingleChoiceItems(labels, checked, (dialog, which) -> {
+                    dialog.dismiss();
+                    onPick.onHour(which);
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    /** A picked hour, for the PIN-free start and end dialogs. */
+    private interface HourPicked {
+        void onHour(int hour);
+    }
+
     /** The picked app's name, its package when it is gone, or Off. */
     private String openOnStartLabel() {
         String pkg = choices.getString(OpenOnStart.KEY, "");
@@ -352,6 +497,12 @@ public final class LauncherSettingsActivity extends Activity {
         pinSettingsChoice.setAlpha(hasPin ? 1f : 0.5f);
         pinClearChoice.setEnabled(hasPin);
         pinClearChoice.setAlpha(hasPin ? 1f : 0.5f);
+        pinGraceChoice.setText(getString(R.string.pin_grace_state, graceLabel()));
+        pinGraceChoice.setEnabled(hasPin);
+        pinGraceChoice.setAlpha(hasPin ? 1f : 0.5f);
+        pinScheduleChoice.setText(getString(R.string.pin_schedule_state, scheduleLabel()));
+        pinScheduleChoice.setEnabled(hasPin);
+        pinScheduleChoice.setAlpha(hasPin ? 1f : 0.5f);
         int hidden = HiddenApps.count(this);
         hiddenChoice.setVisibility(hidden == 0 ? View.GONE : View.VISIBLE);
         hiddenChoice.setText(getString(R.string.hidden_apps_count, hidden));
@@ -365,7 +516,10 @@ public final class LauncherSettingsActivity extends Activity {
         if (requestCode == REQUEST_PIN) {
             Runnable action = pendingPinAction;
             pendingPinAction = null;
-            if (resultCode == RESULT_OK && action != null) action.run();
+            if (resultCode == RESULT_OK) {
+                PinLock.recordUnlock(this);
+                if (action != null) action.run();
+            }
             return;
         }
         if (PinDialogs.takePattern(this, requestCode, resultCode, data)) refresh();
@@ -382,7 +536,7 @@ public final class LauncherSettingsActivity extends Activity {
 
     /** The pattern first when one is set: without it there is nothing to protect. */
     private void withPattern(Runnable action) {
-        if (!PinLock.hasPin(this)) {
+        if (!PinLock.hasPin(this) || !PinLock.needsPin(this)) {
             action.run();
             return;
         }

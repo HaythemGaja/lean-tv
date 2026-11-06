@@ -72,7 +72,8 @@ public final class FolderActivity extends Activity implements FolderAdapter.List
             return;
         }
         pinEnabled = cfg.pinLock && PinLock.hasPin(this);
-        pinRequired = pinEnabled && folder.locked;
+        // A grace window or a PIN-free window opens the folder straight away, locked or not.
+        pinRequired = pinEnabled && folder.locked && PinLock.needsPin(this);
         density = getResources().getDisplayMetrics().density;
         columns = Math.max(2, Math.min(cfg.columns, 6));
         setContentView(R.layout.activity_folder);
@@ -203,7 +204,7 @@ public final class FolderActivity extends Activity implements FolderAdapter.List
             return;
         }
         Runnable launch = () -> launch(entry);
-        if (pinEnabled && PinLock.locked(this, entry.pkg)) askPin(launch);
+        if (pinEnabled && PinLock.locked(this, entry.pkg) && PinLock.needsPin(this)) askPin(launch);
         else launch.run();
     }
 
@@ -240,6 +241,9 @@ public final class FolderActivity extends Activity implements FolderAdapter.List
         if (requestCode == REQUEST_PIN) {
             if (resultCode == RESULT_OK) {
                 unlocked = true;
+                // The pattern was just entered right: the grace window runs from this entry,
+                // so a locked app inside this folder does not ask again straight away.
+                PinLock.recordUnlock(this);
                 Runnable action = pendingPinAction;
                 pendingPinAction = null;
                 if (action != null) action.run();

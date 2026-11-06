@@ -23,6 +23,13 @@ import java.util.Set;
  * {@link Folders}, so there is one place that says whether a folder is locked. The pattern itself is never
  * stored: a random salt and SHA-256 of salt and pattern are, and {@link #verify} compares them in constant
  * time. A wrong pattern only says so and starts again; there is no wait between tries.
+ *
+ * <p>Two conveniences keep the pattern from nagging the person who knows it, and both are off by default.
+ * A grace period ({@link #graceMinutes}) skips the pattern for a few minutes after a successful entry, so
+ * opening one locked thing after another asks only once. A PIN-free window (start and end hour, on picked
+ * days of the week) skips the pattern entirely while it is on, for school hours or the night, say. Both
+ * are read through {@link #needsPin}: every place that asks for the pattern asks that first, and every
+ * successful entry calls {@link #recordUnlock} so the grace window starts from the latest entry.
  */
 final class PinLock {
     /** Up, Down, Left, Right: the only steps a D-pad draws, and the only characters a pattern holds. */
@@ -140,10 +147,117 @@ final class PinLock {
         return Math.max(MIN_STEPS, Math.min(MAX_STEPS, steps));
     }
 
-    /** Forgets the pattern and everything it locked. */
+    // ---- grace period and PIN-free hours ---------------------------------------------------------
+    //
+    // Both are off by default, so a pattern that used to ask every time keeps asking every time until the
+    // person who knows it turns one on in Launcher settings. They are preferences, not secrets: clearing
+    // the pattern keeps them, so a new pattern inherits the same conveniences.
+
+    /** Minutes after a successful entry during which the pattern is not asked again; 0 is off. */
+    static final String KEY_GRACE_MINUTES = "pin_grace_minutes";
+    /** When the pattern was last entered right, in wall-clock milliseconds; 0 is never. */
+    static final String KEY_LAST_UNLOCK = "pin_last_unlock_ms";
+    /** First hour of the PIN-free window, 0 to 23, or -1 when there is no window. */
+    static final String KEY_FREE_START = "pin_free_start";
+    /** Last hour of the PIN-free window, 0 to 23 (the window ends at the start of this hour). */
+    static final String KEY_FREE_END = "pin_free_end";
+    /** Days the PIN-free window runs on, one bit per Calendar day (bit 0 is Sunday); 0 is no days. */
+    static final String KEY_FREE_DAYS = "pin_free_days";
+
+    /** The grace choices the settings row cycles through: off, then 5, 10, 15 and 30 minutes, then an hour. */
+    static final int[] GRACE_OPTIONS = {0, 5, 10, 15, 30, 60};
+
+    static int graceMinutes(Context ctx) {
+        return prefs(ctx).getInt(KEY_GRACE_MINUTES, 0);
+    }
+
+    static void setGraceMinutes(Context ctx, int minutes) {
+        prefs(ctx).edit().putInt(KEY_GRACE_MINUTES, minutes).apply();
+    }
+
+    /** A pattern was just entered right: the grace window runs from now, not from the first entry of the day. */
+    static void recordUnlock(Context ctx) {
+        prefs(ctx).edit().putLong(KEY_LAST_UNLOCK, System.currentTimeMillis()).apply();
+    }
+
+    static int freeStart(Context ctx) {
+        return prefs(ctx).getInt(KEY_FREE_START, -1);
+    }
+
+    static int freeEnd(Context ctx) {
+        return prefs(ctx).getInt(KEY_FREE_END, -1);
+    }
+
+    static int freeDays(Context ctx) {
+        return prefs(ctx).getInt(KEY_FREE_DAYS, 0);
+    }
+
+    /** Saves one whole PIN-free window at once: the days it runs on and the hours it covers. */
+    static void setFreeSchedule(Context ctx, int start, int end, int daysMask) {
+        prefs(ctx).edit().putInt(KEY_FREE_START, start).putInt(KEY_FREE_END, end)
+                .putInt(KEY_FREE_DAYS, daysMask).apply();
+    }
+
+    /** Turns the PIN-free window off, leaving the grace period alone. */
+    static void clearFreeSchedule(Context ctx) {
+        prefs(ctx).edit().putInt(KEY_FREE_START, -1).putInt(KEY_FREE_END, -1)
+                .putInt(KEY_FREE_DAYS, 0).apply();
+    }
+
+    /** Whether {@code nowMs} is still inside the grace window a successful entry at {@code lastUnlockMs} opened. */
+    static boolean withinGrace(long lastUnlockMs, int graceMinutes, long nowMs) {
+        if (graceMinutes <= 0 || lastUnlockMs <= 0) return false;
+        return nowMs - lastUnlockMs < graceMinutes * 60_000L;
+    }
+
+    /**
+     * Whether {@code hour} falls in the window from {@code start} to {@code end}: a start before the end is
+     * one stretch of the day, a start after the end runs overnight (22 to 7, say), and start and end the
+     * same means the whole day. The window ends at the start of the end hour, so 8 to 15 is free until 15:00.
+     */
+    static boolean hourInWindow(int start, int end, int hour) {
+        if (start == end) return true;
+        if (start < end) return hour >= start && hour < end;
+        return hour >= start || hour < end;
+    }
+
+    /**
+     * Whether the PIN-free window is on for this {@link java.util.Calendar} day and hour. The day that
+     * matters is the day the window started on, so the small hours of an overnight window belong to the
+     * night before: with Mon–Fri 22:00–07:00, Saturday 02:00 is free (Friday night's tail) and Monday
+     * 02:00 is not (Sunday night was never picked). The evening hours belong to their own day.
+     */
+    static boolean inFreeWindow(int start, int end, int daysMask, int dayOfWeek, int hour) {
+        if (start < 0 || end < 0 || daysMask == 0) return false;
+        if (start > end && hour < end) {
+            int prevDay = dayOfWeek == java.util.Calendar.SUNDAY
+                    ? java.util.Calendar.SATURDAY : dayOfWeek - 1;
+            return (daysMask & (1 << (prevDay - 1))) != 0;
+        }
+        if ((daysMask & (1 << (dayOfWeek - 1))) == 0) return false;
+        return hourInWindow(start, end, hour);
+    }
+
+    /**
+     * Whether the pattern needs asking right now: no pattern means never, a grace window or a PIN-free
+     * window means not now. Every place that asks for the pattern asks this first, so the two conveniences
+     * cover apps, folders, the settings and guest mode alike. The device clock decides the window, which
+     * is fine for a household lock: it is the same clock the TV's own schedule runs on.
+     */
+    static boolean needsPin(Context ctx) {
+        if (!hasPin(ctx)) return false;
+        long now = System.currentTimeMillis();
+        if (withinGrace(prefs(ctx).getLong(KEY_LAST_UNLOCK, 0), graceMinutes(ctx), now)) return false;
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        if (inFreeWindow(freeStart(ctx), freeEnd(ctx), freeDays(ctx),
+                cal.get(java.util.Calendar.DAY_OF_WEEK), cal.get(java.util.Calendar.HOUR_OF_DAY))) return false;
+        return true;
+    }
+
+    /** Forgets the pattern and everything it locked. The grace and PIN-free choices stay, for the next pattern. */
     static void clear(Context ctx) {
         prefs(ctx).edit().remove(KEY_KIND).remove(KEY_HASH).remove(KEY_SALT).remove(KEY_STEPS)
-                .remove(KEY_APPS).remove(KEY_SETTINGS).remove(KEY_PENDING).apply();
+                .remove(KEY_APPS).remove(KEY_SETTINGS).remove(KEY_PENDING).remove(KEY_LAST_UNLOCK).apply();
     }
 
     // ---- what is locked --------------------------------------------------------------------------

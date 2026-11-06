@@ -155,6 +155,18 @@
             android:visibility="gone" />
 
         <TextView
+            android:id="@+id/pinGraceChoice"
+            style="@style/SettingsRow"
+            android:layout_marginTop="10dp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/pinScheduleChoice"
+            style="@style/SettingsRow"
+            android:layout_marginTop="10dp"
+            android:visibility="gone" />
+
+        <TextView
             android:id="@+id/hiddenChoice"
             style="@style/SettingsRow"
             android:layout_marginTop="10dp"

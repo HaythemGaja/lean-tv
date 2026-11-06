@@ -1175,6 +1175,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                         .remove(PinLock.KEY_PENDING).apply();
             }
             if (resultCode != RESULT_OK) return;
+            // The pattern was just entered right: the grace window runs from this entry.
+            PinLock.recordUnlock(this);
             if (action != null) action.run();
             else if (pkg != null && !pkg.isEmpty()) launchPackage(pkg);
             return;
@@ -1838,6 +1840,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         // A pattern is what the lock needs: whether this tile is in the locked set was decided when its tile was
         // drawn, and reading the set again here could disagree with the tile the person is looking at.
         if (!pinEnabled || !PinLock.hasPin(this)) return false;
+        // A grace window or a PIN-free window means the tile opens straight away: returning false lets the
+        // launch run, exactly as if the tile had never been locked.
+        if (!PinLock.needsPin(this)) return false;
         askPin(launch, pkg);
         return true;
     }
@@ -1849,7 +1854,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     /** A settings entry point, or the PIN first when pin_lock locks the settings. */
     private void ifSettingsUnlocked(Runnable action) {
-        if (pinEnabled && PinLock.settingsLocked(this)) askPin(action);
+        if (pinEnabled && PinLock.settingsLocked(this) && PinLock.needsPin(this)) askPin(action);
         else action.run();
     }
 
@@ -1906,7 +1911,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             Toast.makeText(this, R.string.pin_needed, Toast.LENGTH_SHORT).show();
             return;
         }
-        askPin(this::flipGuestMode);
+        // A pattern entered a moment ago (or a PIN-free window) has already proved who this is.
+        if (PinLock.needsPin(this)) askPin(this::flipGuestMode);
+        else flipGuestMode();
     }
 
     private void flipGuestMode() {
