@@ -68,6 +68,28 @@ final class PinLock {
         return !choosing && entrySteps > 0 && entrySteps == patternSteps;
     }
 
+    /**
+     * Whether an explicit OK press should check the entry as it stands: any 4 to 8 step pattern, not only one
+     * exactly as long as the stored length. The stored length is the only record of how long the pattern is,
+     * and if it is stale (a pattern set before it was recorded, or recorded wrong) an OK press that only
+     * accepted that length would leave the right pattern uncheckable: the auto-submit at the stale length
+     * would fail first, and OK would just say "keep going". Checking the full entry on OK is the way out.
+     */
+    static boolean checksOnOk(int entrySteps) {
+        return entrySteps >= MIN_STEPS && entrySteps <= MAX_STEPS;
+    }
+
+    /**
+     * Repairs a stale stored length after a pattern has just verified: the entry that passed is the real
+     * pattern, so its length is the right one to auto-submit at next time. Only the length is rewritten;
+     * the salt and hash that just verified stay exactly as they are.
+     */
+    static void repairSteps(Context ctx, String pattern) {
+        if (!validPattern(pattern)) return;
+        if (steps(ctx) == pattern.length()) return;
+        prefs(ctx).edit().putInt(KEY_STEPS, pattern.length()).apply();
+    }
+
     static String newSalt() {
         byte[] salt = new byte[16];
         new SecureRandom().nextBytes(salt);

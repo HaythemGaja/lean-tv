@@ -35,6 +35,19 @@ public class PinLockTest {
     }
 
     @Test
+    public void anOkPressChecksAnyFourToEightStepEntryNotOnlyTheStoredLength() {
+        // A pattern longer or shorter than a stale stored length must still be checkable on OK:
+        // auto-submit at the stored length fails first, and OK is the way out of that trap.
+        assertFalse(PinLock.checksOnOk(0));
+        assertFalse(PinLock.checksOnOk(3));
+        assertTrue(PinLock.checksOnOk(4));
+        assertTrue(PinLock.checksOnOk(5));
+        assertTrue(PinLock.checksOnOk(6));
+        assertTrue(PinLock.checksOnOk(8));
+        assertFalse(PinLock.checksOnOk(9));
+    }
+
+    @Test
     public void theStoredHashVerifiesThePatternAndNothingElse() {
         String salt = PinLock.newSalt();
         String hash = PinLock.hash("UUDL", salt);

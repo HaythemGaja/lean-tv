@@ -8,9 +8,18 @@
     android:padding="6dp"
     android:elevation="12dp">
 
-    <LinearLayout
-        android:id="@+id/rows"
+    <!-- Scrolls when the rows don't fit below the tile on a 720p screen: without this the menu
+         runs off the bottom, its lower rows are cut off, and the D-pad cannot reach them. -->
+    <ScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical" />
+        android:scrollbars="none"
+        android:overScrollMode="never">
+
+        <LinearLayout
+            android:id="@+id/rows"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+    </ScrollView>
 </LinearLayout>

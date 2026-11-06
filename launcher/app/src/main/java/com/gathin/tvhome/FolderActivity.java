@@ -50,6 +50,7 @@ public final class FolderActivity extends Activity implements FolderAdapter.List
     private boolean pinEnabled;
     private boolean pinRequired;
     private boolean unlocked;
+    private boolean pinAsked;
     private boolean changed;
     private float density;
     private int columns;
@@ -85,7 +86,20 @@ public final class FolderActivity extends Activity implements FolderAdapter.List
         adapter = new FolderAdapter(this, this, columns, cfg.animations, cfg.reducedMotion);
         grid.setAdapter(adapter);
         reload();
-        if (pinRequired) askPin(null);
+    }
+
+    /**
+     * The pattern is asked here, not in onCreate: if the folder screen is rebuilt while the pattern screen
+     * is up (a 1 GB TV reclaiming memory), Android delivers the pattern result to the new instance before
+     * its first resume, so by the time this runs {@code unlocked} is already true and it does not ask again.
+     * Asking in onCreate would launch a second pattern screen on top of the result that just came back, and
+     * the right pattern would land the person on the lock screen again. If no result arrives (the whole
+     * process died), this still asks, so the folder is never left open without its pattern.
+     */
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (pinRequired && !unlocked && !pinAsked && !isFinishing()) askPin(null);
     }
 
     /** The folder's name, how many apps it holds, and a line of help when it is empty. */
@@ -214,6 +228,7 @@ public final class FolderActivity extends Activity implements FolderAdapter.List
 
     /** One pattern entry per locked tile: unlocking one app says nothing about the next. */
     private void askPin(Runnable action) {
+        pinAsked = true;
         pendingPinAction = action;
         Intent intent = new Intent(this, PinActivity.class);
         startActivityForResult(intent, REQUEST_PIN);
@@ -228,8 +243,12 @@ public final class FolderActivity extends Activity implements FolderAdapter.List
                 Runnable action = pendingPinAction;
                 pendingPinAction = null;
                 if (action != null) action.run();
-            } else if (pinRequired && !unlocked) {
-                finish();
+            } else {
+                // A cancelled pattern must not leave a stale action behind, and must not latch the
+                // folder ask shut: a later resume in this same instance may still need to ask.
+                pendingPinAction = null;
+                if (pinRequired && !unlocked) finish();
+                else pinAsked = false;
             }
             return;
         }
@@ -368,7 +387,29 @@ public final class FolderActivity extends Activity implements FolderAdapter.List
     private void show(View panel, LinearLayout rows, PopupWindow popup, View card) {
         panel.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
         popup.setWidth(Math.max((int) (200 * density), panel.getMeasuredWidth()));
-        popup.showAsDropDown(card, 0, (int) (8 * density), Gravity.START);
+        // A long menu under a low tile runs off the bottom of a 720p screen: capping its height to
+        // the room below does not save it when that room is near zero, because the popup itself
+        // would still start below the tile and end past the screen edge. So pick the side with
+        // more room: below when it fits, above when it does not, and cap to that side's room (at
+        // least one row) so the ScrollView in popup_inputs can scroll the rest into view.
+        // Room is measured against the window's decor height, in the same coordinates as the
+        // tile's location in window — not the display height, which over-reads under an inset.
+        int gap = (int) (8 * density);
+        int[] at = new int[2];
+        card.getLocationInWindow(at);
+        int windowHeight = getWindow().getDecorView().getHeight();
+        int belowRoom = windowHeight - (at[1] + card.getHeight() + gap) - (int) (16 * density);
+        int aboveRoom = at[1] - gap - (int) (16 * density);
+        int measured = panel.getMeasuredHeight();
+        boolean above = belowRoom < measured && aboveRoom > belowRoom;
+        int height = above ? Math.min(measured, Math.max(aboveRoom, (int) (48 * density)))
+                : Math.min(measured, Math.max(belowRoom, (int) (48 * density)));
+        popup.setHeight(height);
+        if (above) {
+            popup.showAtLocation(grid, Gravity.NO_GRAVITY, at[0], Math.max(0, at[1] - gap - height));
+        } else {
+            popup.showAsDropDown(card, 0, gap, Gravity.START);
+        }
         rows.getChildAt(0).requestFocus();
     }
 

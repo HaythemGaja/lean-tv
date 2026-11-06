@@ -16,7 +16,9 @@ import android.widget.TextView;
  * cannot be read over someone's shoulder. In unlock mode the screen submits by itself at the stored length, which
  * is what makes an entry workable without reaching for OK.
  *
- * <p>A wrong pattern says so and clears the entry: there is no wait before the next try.
+ * <p>A wrong pattern says so and clears the entry when OK was pressed; a wrong auto-submit at the stored
+ * length keeps the entry, so a pattern longer than a stale stored length can still be finished with OK.
+ * There is no wait before the next try either way.
  *
  * <p>Choosing a pattern ({@link #EXTRA_CHOOSE}) asks for it twice and returns it in {@link #EXTRA_PATTERN}.
  *
@@ -79,7 +81,7 @@ public final class PinActivity extends Activity {
             case KeyEvent.KEYCODE_DPAD_CENTER:
             case KeyEvent.KEYCODE_ENTER:
             case KeyEvent.KEYCODE_NUMPAD_ENTER:
-                submit();
+                submit(false);
                 return true;
             case KeyEvent.KEYCODE_DEL:
                 back();
@@ -106,7 +108,7 @@ public final class PinActivity extends Activity {
         // A dot says a press arrived; which arrow it was stays off the screen, and an old message stops applying.
         message.setText("");
         render();
-        if (PinLock.submitsAt(choosing, entry.length(), length)) submit();
+        if (PinLock.submitsAt(choosing, entry.length(), length)) submit(true);
     }
 
     private void back() {
@@ -125,18 +127,26 @@ public final class PinActivity extends Activity {
         dots.setText(shown.toString().trim());
     }
 
-    private void submit() {
+    /**
+     * @param auto true when the stored length submitted the entry by itself; false for an explicit OK press.
+     * An OK press checks any 4 to 8 step entry, not only one exactly as long as the stored length, so a
+     * pattern longer or shorter than a stale stored length is still checkable. An auto-submit that fails
+     * keeps the entry instead of clearing it, so the person can keep adding steps to the full pattern and
+     * press OK: clearing it would trap a pattern longer than the stored length in a loop of failing
+     * auto-submits. An OK press that fails clears it, as before.
+     */
+    private void submit(boolean auto) {
         if (entry.length() == 0) return;
         if (choosing) {
             choose();
             return;
         }
-        if (entry.length() != length) {
+        if (!PinLock.checksOnOk(entry.length())) {
             // A blind entry that stops early is not a wrong pattern, so it does not count as one.
             message.setText(R.string.pin_keep_going);
             return;
         }
-        check();
+        check(!auto);
     }
 
     /** Picks a new pattern: the first entry, then the same arrows again, since a blind entry can slip. */
@@ -167,15 +177,19 @@ public final class PinActivity extends Activity {
         finish();
     }
 
-    private void check() {
+    private void check(boolean clearOnFail) {
         String salt = getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE).getString(PinLock.KEY_SALT, "");
         String hash = getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE).getString(PinLock.KEY_HASH, "");
         if (PinLock.verify(entry.toString(), salt, hash)) {
+            // The entry that just passed is the real pattern: if its length differs from the stored one,
+            // repair the stored length so auto-submit works at the right step next time instead of
+            // failing and forcing OK every unlock.
+            PinLock.repairSteps(this, entry.toString());
             setResult(RESULT_OK);
             finish();
             return;
         }
-        entry.setLength(0);
+        if (clearOnFail) entry.setLength(0);
         message.setText(R.string.pin_wrong);
         render();
     }

@@ -3746,11 +3746,44 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     /** Drop in: fade and unfold from the top edge, hanging under the anchor pill. */
     private void dropIn(PopupWindow popup, View panel, View anchor, int gravity) {
-        panel.setAlpha(0f);
-        panel.setPivotY(0f);
-        panel.setScaleY(0.92f);
-        panel.setTranslationY(-8 * density);
-        popup.showAsDropDown(anchor, 0, (int) (10 * density), gravity);
+        // A long menu under a low tile runs off the bottom of a 720p screen, its lower rows cut off
+        // with no way to scroll to them — and capping its height to the room below does not save it
+        // when that room is near zero, because the popup itself would still start below the tile
+        // and end past the screen edge. So pick the side with more room: below when it fits, above
+        // when it does not, and cap to that side's room (at least one row) so the ScrollView in
+        // popup_inputs can scroll the rest into view. A menu that fits below is unchanged.
+        // A caller that already set an explicit height (Module cards) keeps it: measuring its
+        // 0dp-weight ScrollView unconstrained would under-read its height.
+        int measured = popup.getHeight() > 0 ? popup.getHeight() : 0;
+        if (measured <= 0) {
+            panel.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
+            measured = panel.getMeasuredHeight();
+        }
+        int gap = (int) (10 * density);
+        int[] at = new int[2];
+        anchor.getLocationInWindow(at);
+        int belowRoom = root.getHeight() - (at[1] + anchor.getHeight() + gap) - (int) (24 * density);
+        int aboveRoom = at[1] - gap - (int) (16 * density);
+        boolean above = belowRoom < measured && aboveRoom > belowRoom;
+        int height = above ? Math.min(measured, Math.max(aboveRoom, (int) (48 * density)))
+                : Math.min(measured, Math.max(belowRoom, (int) (48 * density)));
+        popup.setHeight(height);
+        if (above) {
+            panel.setAlpha(0f);
+            panel.setPivotY(height);
+            panel.setScaleY(0.92f);
+            panel.setTranslationY(8 * density);
+            int width = popup.getWidth() > 0 ? popup.getWidth() : panel.getMeasuredWidth();
+            int x = gravity == Gravity.END ? at[0] + anchor.getWidth() - width : at[0];
+            popup.showAtLocation(root, Gravity.NO_GRAVITY, Math.max(0, x),
+                    Math.max(0, at[1] - gap - height));
+        } else {
+            panel.setAlpha(0f);
+            panel.setPivotY(0f);
+            panel.setScaleY(0.92f);
+            panel.setTranslationY(-8 * density);
+            popup.showAsDropDown(anchor, 0, gap, gravity);
+        }
         panel.animate().alpha(1f).scaleY(1f).translationY(0f).setDuration(reducedMotion ? Motion.REDUCED_MS : 220)
                 .setInterpolator(new android.view.animation.DecelerateInterpolator(1.6f)).start();
     }
@@ -4007,12 +4040,16 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         panel.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
         popup.setWidth(Math.max((int) (200 * density), panel.getMeasuredWidth()));
         // Dock tiles sit near the bottom of the screen: open the menu above the tile when it would not fit below.
+        // The above menu is capped to the space above the tile too, so a menu taller than that space
+        // scrolls instead of being clipped at the top.
         int[] at = new int[2];
         card.getLocationInWindow(at);
         int gap = (int) (10 * density), height = panel.getMeasuredHeight();
         if (at[1] + card.getHeight() + gap + height <= root.getHeight()) {
             dropIn(popup, panel, card, Gravity.START);
         } else {
+            height = Math.min(height, Math.max(at[1] - gap, (int) (48 * density)));
+            popup.setHeight(height);
             panel.setAlpha(0f);
             panel.setPivotY(height);
             panel.setScaleY(0.92f);
