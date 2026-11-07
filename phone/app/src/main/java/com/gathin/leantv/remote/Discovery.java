@@ -244,20 +244,25 @@ final class Discovery {
         }
     }
 
+    /** The entry for a host, made if this is the first service seen from it. */
+    private MutableTv knownFor(String host) {
+        synchronized (byHost) {
+            MutableTv known = byHost.get(host);
+            if (known == null) {
+                known = new MutableTv(host);
+                byHost.put(host, known);
+            }
+            return known;
+        }
+    }
+
     /** What one resolved service says about its host: learn it, probe 5555 once, then report it. */
     private void learn(NsdServiceInfo service, String kind) {
         InetAddress address = service.getHost();
         if (!(address instanceof Inet4Address)) return;   // IPv6 is not a TV this remote can reach
         String host = address.getHostAddress();
         if (host == null || isOwn(host, ownAddresses)) return;
-        MutableTv known;
-        synchronized (byHost) {
-            known = byHost.get(host);
-            if (known == null) {
-                known = new MutableTv(host);
-                byHost.put(host, known);
-            }
-        }
+        MutableTv known = knownFor(host);
         synchronized (known) {
             String name = service.getServiceName();
             if (known.name.isEmpty() && name != null && !name.isEmpty()) known.name = name;
