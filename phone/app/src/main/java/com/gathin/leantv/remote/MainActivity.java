@@ -47,7 +47,8 @@ public final class MainActivity extends Activity {
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final ExecutorService frames = Executors.newSingleThreadExecutor();
     private final Handler ui = new Handler(Looper.getMainLooper());
-    private final List<Remotes.Tv> found = new ArrayList<>();
+    /** TVs the scan has reported, by host: the same host is reported again when its 5555 probe comes back. */
+    private final Map<String, Discovery.Tv> found = new LinkedHashMap<>();
 
     private AdbClient client;
     private AdbKeys keys;
@@ -141,19 +142,26 @@ public final class MainActivity extends Activity {
         connectTo(host, port, "");
     }
 
+    /** The port the last connection actually opened on: 5555 after a TLS-port fallback. */
+    private int connectedPort = ADB_PORT;
+
     private void connectTo(String host, int port, String name) {
         AdbClient open = client;
         client = null;
         if (open != null) io.execute(open::close);
         hostField.setText(port == ADB_PORT ? host : host + ":" + port);
         prefs().edit().putString(HOST, host).putInt(PORT, port).apply();
-        if (name != null && !name.isEmpty()) Remotes.save(this, name, host, port);
         show(getString(R.string.connecting, host));
         if (connecting) return;
         connecting = true;
         io.execute(() -> {
             try {
                 client = openWithRetry(host, port);
+                // Remember the port that worked, not the one that was asked for: a TV saved by the
+                // old app at a TLS port is re-saved at 5555, so Saved stops failing the same way.
+                prefs().edit().putString(HOST, host).putInt(PORT, connectedPort).apply();
+                if (name != null && !name.isEmpty()) Remotes.save(this, name, host, connectedPort);
+                ui.post(() -> hostField.setText(connectedPort == ADB_PORT ? host : host + ":" + connectedPort));
                 show(getString(R.string.connected, host));
             } catch (IOException | RuntimeException e) {
                 fail(e);
@@ -168,7 +176,14 @@ public final class MainActivity extends Activity {
         IOException last = null;
         for (int attempt = 0; attempt < 3; attempt++) {
             try {
-                return AdbClient.connect(host, port, keys(), 8000);
+                AdbClient client = AdbClient.connect(host, port, keys(), 8000);
+                connectedPort = port;
+                return client;
+            } catch (AdbClient.TlsPortException e) {
+                // The port speaks TLS, not plain Adb: a TV saved by the old app at a discovered TLS
+                // port, or a typed TLS port, gets one try at 5555 instead of three failures.
+                if (port == ADB_PORT) throw e;
+                return openWithRetry(host, ADB_PORT);
             } catch (IOException e) {
                 last = e;
                 pause();
@@ -217,8 +232,9 @@ public final class MainActivity extends Activity {
         show(getString(R.string.scanning));
         discovery = Discovery.start(this, new Discovery.Listener() {
             @Override
-            public void found(String name, String host, int port) {
-                found.add(new Remotes.Tv(name, host, port));
+            public void found(Discovery.Tv tv) {
+                found.put(tv.host, tv);
+                show(getString(R.string.tvs_found, found.size()));
             }
 
             @Override
@@ -226,14 +242,45 @@ public final class MainActivity extends Activity {
                 discovery = null;
                 if (problem != null) {
                     show(getString(R.string.failed, problem));
-                } else if (found.isEmpty()) {
+                } else if (pickable().isEmpty()) {
+                    // Nothing found that is a TV with debugging at all: a Cast-only device, if one
+                    // was seen, is not a remote target, and the fix is the same either way.
                     show(getString(R.string.no_tvs_found));
+                } else if (!hasConnectable()) {
+                    // Every TV found only offers Wireless debugging: no connect here could work,
+                    // so say what to turn on instead of offering a list of dead ends.
+                    showTlsOnly(null);
                 } else {
-                    show(getString(R.string.tvs_found, found.size()));
-                    pick(found, R.string.scan);
+                    show(getString(R.string.tvs_found, pickable().size()));
+                    pick(pickable(), R.string.scan);
                 }
             }
         });
+    }
+
+    /** TVs the picker may offer: connectable ones, and TLS-only ones with their guidance. */
+    private List<Discovery.Tv> pickable() {
+        List<Discovery.Tv> offered = new ArrayList<>();
+        for (Discovery.Tv tv : found.values()) {
+            if (tv.offerable()) offered.add(tv);
+        }
+        return offered;
+    }
+
+    /** At least one TV the scan saw listens on 5555. */
+    private boolean hasConnectable() {
+        for (Discovery.Tv tv : found.values()) if (tv.connectable()) return true;
+        return false;
+    }
+
+    /** A TV that only offers Wireless debugging, and what to turn on so it can be driven at all. */
+    private void showTlsOnly(Discovery.Tv tv) {
+        String title = tv == null ? getString(R.string.scan) : tv.label();
+        new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setMessage(R.string.tv_tls_only_hint)
+                .setPositiveButton(android.R.string.ok, null)
+                .show();
     }
 
     private void showSaved() {
@@ -259,14 +306,22 @@ public final class MainActivity extends Activity {
                 .show();
     }
 
-    private void pick(List<Remotes.Tv> tvs, int title) {
+    private void pick(List<Discovery.Tv> tvs, int title) {
         List<String> labels = new ArrayList<>();
-        for (Remotes.Tv tv : tvs) labels.add(tv.label());
+        for (Discovery.Tv tv : tvs) {
+            labels.add(tv.tlsOnly() ? tv.label() + " — " + getString(R.string.tv_tls_only) : tv.label());
+        }
         new AlertDialog.Builder(this)
                 .setTitle(title)
                 .setItems(labels.toArray(new String[0]), (dialog, which) -> {
-                    Remotes.Tv tv = tvs.get(which);
-                    connectTo(tv.host, tv.port, tv.name);
+                    Discovery.Tv tv = tvs.get(which);
+                    if (tv.tlsOnly()) {
+                        showTlsOnly(tv);
+                        return;
+                    }
+                    // Always 5555, never the port the scan found the TV on: a discovered TLS port
+                    // speaks TLS, and plain Adb sent there is what used to fail every time.
+                    connectTo(tv.host, Discovery.ADB_PORT, tv.name);
                 })
                 .show();
     }

@@ -20,6 +20,13 @@ import java.nio.charset.StandardCharsets;
  * no-INTERNET rule: it only ever answers its own debug bridge, and only while network debugging is on.
  */
 final class AdbClient implements Closeable {
+    /** The TV answered STLS: this port speaks TLS, not plain Adb. The caller may retry on 5555. */
+    static final class TlsPortException extends IOException {
+        TlsPortException(String message) {
+            super(message);
+        }
+    }
+
     private static final String MARKER = "__leantv_done__";
     private static final int SHELL_TIMEOUT_MS = 10000;
     private static final int EXEC_TIMEOUT_MS = 20000;
@@ -68,6 +75,12 @@ final class AdbClient implements Closeable {
             AdbMessage message = AdbMessage.read(in);
             if (message == null) throw new IOException("The TV closed the connection");
             if (message.command == AdbMessage.CNXN) return;
+            // STLS means this port speaks TLS, not plain Adb: waiting the retries out would only end
+            // in the same failure, so say so at once. Discovery never sends us here, but a typed
+            // address can, and the typed port is the one thing the person can fix.
+            if (message.command == AdbMessage.STLS) {
+                throw new TlsPortException("This TV port uses wireless debugging (TLS). Connect to port 5555 instead.");
+            }
             if (message.command != AdbMessage.AUTH || message.arg0 != AdbMessage.AUTH_TOKEN) continue;
             if (!signed) {
                 signed = true;

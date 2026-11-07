@@ -17,6 +17,8 @@ final class AdbMessage {
     static final int CNXN = cmd("CNXN");
     static final int AUTH = cmd("AUTH");
     static final int OPEN = cmd("OPEN");
+    /** STLS: the TV wants TLS before anything else, which this remote does not speak (see AdbClient). */
+    static final int STLS = cmd("STLS");
     static final int OKAY = cmd("OKAY");
     static final int WRTE = cmd("WRTE");
     static final int CLSE = cmd("CLSE");
@@ -26,7 +28,12 @@ final class AdbMessage {
     static final int AUTH_SIGNATURE = 2;
     static final int AUTH_PUBLIC_KEY = 3;
 
-    static final int VERSION = 0x01000001;
+    // The original protocol version, not the current one: 0x01000001 is AOSP's A_VERSION_SKIP_CHECKSUM,
+    // and checksums are skipped when both sides are at least that version, so a modern TV that hears it
+    // stops sending checksums while read() below still verifies them, and refuses its very first reply
+    // with "Adb payload checksum is wrong" -- the failure this remote showed on a real TV. dadb speaks
+    // 0x01000000 and the TV then computes and verifies checksums both ways, which is what this code does.
+    static final int VERSION = 0x01000000;
     static final int MAX_PAYLOAD = 256 * 1024;
     private static final int HEADER = 24;
 

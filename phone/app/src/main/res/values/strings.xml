@@ -28,6 +28,8 @@
     <string name="screen">Screen</string>
     <string name="scanning">Looking for TVs on this network…</string>
     <string name="no_tvs_found">No TV answered. Turn on network debugging in the TV\'s Developer options.</string>
+    <string name="tv_tls_only">Wireless debugging only</string>
+    <string name="tv_tls_only_hint">This TV only offers wireless debugging, which this remote doesn\'t speak. It needs to listen on port 5555: connect it once from a computer — pair wireless debugging there, then run \"adb tcpip 5555\" — or turn on network debugging in its Developer options if it has that switch. Then scan again.</string>
     <string name="tvs_found">%1$d TVs found</string>
     <string name="no_saved">No TV saved yet: connect to one first.</string>
     <string name="forget">Forget all saved TVs</string>
